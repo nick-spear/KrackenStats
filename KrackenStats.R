@@ -98,11 +98,8 @@ getTable <- function() {
     host_val <- "10.0.3.7"
     port_val <- "5432"
 
-#    writeLines(paste(Sys.time(), ": Establishing database connection..."))
     datab_con <- dbConnect(dbDriver("PostgreSQL"), user=user_name, password=pass, dbname=database_name, host=host_val, port=port_val)
-#    writeLines(paste(Sys.time(), ": Connection established. Sending query..."))
     result <- dbGetQuery(datab_con, "SELECT id,plaintext,cpu_brute_time,seen_count,rank_wild FROM rainbow WHERE rank_wild > 0 OR seen_count > 0")
-#    writeLines(paste(Sys.time(), ": Response to query received."))
     output <- result
     
 }
