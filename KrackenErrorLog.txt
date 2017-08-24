@@ -1,0 +1,7 @@
+Error in socketConnection(host = hostIn, port = portIn, blocking = blockingIn,  : 
+  cannot open the connection
+Calls: server -> socketConnection
+In addition: Warning message:
+In socketConnection(host = hostIn, port = portIn, blocking = blockingIn,  :
+  problem in listening on this socket
+Execution halted
