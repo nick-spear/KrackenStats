@@ -68,60 +68,45 @@ def rCall(argString):
           print('Now waiting 5 minutes for next function')
           time.sleep(300)
 
-def db_to_list(key, db_conn):
-  cur = db_conn.cursor()
-  sql = ''.join(["SELECT * FROM ", key])
-  cur.execute(sql)
-  results_list = cur.fetchall()
-  censored_results =  censor.censor_list(results_list, censor_list, mark_censored=True)
-  data = []
-  for result in censored_results:
-    data.append({"plaintext": result[0], key: result[1]})
-  return data
-
 def client(connection):
   inVal = connection.recv(1024)
   print(inVal)
   val_list = inVal.split(" ")
-  if val_list[0] == "gettop":
-    try:
-      db_conn = psycopg2.connect(
+  if val_list[0] == "getuserstats":
+    db_conn = psycopg2.connect(
          dbname='imt-admin',
          user='imt-admin',
          host='10.0.3.7',
          password='1q2w3e4r'
-     )
-      # get top 10 rank wild
-      print("You are connected to 'imt-admin'!")
-      rank_list = db_to_list("rank_in_wild", db_conn)
-      # get top fastest
-      fastest_list = db_to_list("fastest_crack_time", db_conn)
-      # get top seen
-      seen_list = db_to_list("seen_count", db_conn)
-      # construct JSON and send
-      all_dict = {"wild_common": rank_list, "fastest": fastest_list, "seen_common": seen_list}
-      json_data = json.dump(all_dict)
-      connection.sendall(str(json_data).encode('utf-8'))
-      connection.close()
-    except psycopg2.DatabaseError as e:
-      if db_conn:
-          db_conn.rollback()
-      print("Error: %s" % e)
-    finally:
-      if db_conn:
-           db_conn.close()
-  elif val_list[0] == "getuserstats":
-    command = 'Rscript'
-    pathToScript = '/home/imt-admin/Kracken/KrackenStats.R'
-    cmd = [command, pathToScript, argString]
-    rOut = subprocess.check_output(cmd, universal_newlines=True)
-    connection.sendall(rOut.encode('utf-8'))
+   )
+    print("You are connected to 'imt-admin'!")
+    cur = db_conn.cursor()
+    sql = 'SELECT * FROM rank_in_wild;'
+    cur.execute(sql)
+    res_list = cur.fetchall()
+    ret_list = []
+    for i in range(len(res_list)):
+        c = censor.censor(res_list[i][0], censor_list, mark_censored=True)
+        ret_list.append([c, res_list[i][1]])
+    connection.sendall(str(ret_list).encode('utf-8'))
     connection.close()
+  except psycopg2.DatabaseError as e:
+    if db_conn:
+        db_conn.rollback()
+    print("Error: %s" % e)
+  finally:
+    if db_conn:
+         db_conn.close()
+   print("Get user stats")
   else:
-    connection.sendall(json.dump({"error": "bad request", "error_token": val_list[0]}))
+    print("else")
+  try:
+#  print(datetime.datetime.now().strftime('%H:%M:%S') + ' : Received \'' + outVal + '\' from R script. Sending to client...')
+#  connection.sendall(outVal.encode('utf-8'))
+#  print(datetime.datetime.now().strftime('%H:%M:%S') + ' : Response sent to client')
+#  connection.close()
 
-
-def listen():
+def top10():
      while True:
           connection, address = sock.accept()
           print(datetime.datetime.now().strftime('%H:%M:%S') + ' : Connected with ' + address[0] + ':' + str(address[1]))
@@ -131,8 +116,9 @@ def update_db():
      while True:
           rCall('gettop 10'.encode())
 
-t1 = Thread(target = listen)
+t1 = Thread(target = top10)
 t2 = Thread(target = update_db)
 
 t1.start()
 t2.start()
+print("2 new threads started")

@@ -87,6 +87,17 @@ parseInput <- function(input) {
     
 }
 
+checkTable <- function(tableName) {
+    database_name <- "imt-admin"
+    user_name <- "imt-admin"
+    pass <- "1q2w3e4r"
+    host_val <- "10.0.3.7"
+    port_val <- "5432"
+
+    datab_con <- dbConnect(dbDriver("PostgreSQL"), user=user_name, password=pass, dbname=database_name, host=host_val, port=port_val)
+    result <- dbGetQuery(datab_con, paste("SELECT * FROM ", tableName))    
+}
+
 getTable <- function() {
     
     # Function to get current password database
@@ -113,11 +124,18 @@ userStats <- function(string, table) {
     #     unique_pass_count: (integer) .. Returns number of unique passwords entered by users
     #     average: (float) .............. Average Krack time of brute-forced population
 
-
-    # Pulls Kracktime associated with password string
-    Krack_time_val <- table$cpu_brute_time[match(string, table$id)]
-    
     placehold <- "Neil is a bum"
+
+    # Pulls Kracktime associated with id string
+    Krack_time_val <- table$cpu_brute_time[match(string, table$id)]
+    password_val <- table$plaintext[match(string, table$id)]
+    if (is.na(Krack_time_val)) {
+        Krack_time_val <- -1
+        password_val <- ""
+	seen_val <- FALSE
+    } else {
+        seen_val <- TRUE
+    }
 
     percentile_val <- placehold
     valid_Kracks <- placehold
@@ -142,7 +160,7 @@ userStats <- function(string, table) {
         average_val <- mean(valid_Kracks$cpu_brute_time, na.rm = TRUE)
     }
 
-    result <- list(cpu_brute_time = Krack_time_val, percentile = percentile_val, rank = rank_val, unique_pass_count = number_of_passes_val, average = average_val)
+    result <- list(password = password_val, seen = seen_val, cpu_brute_time = Krack_time_val, percentile = percentile_val, rank = rank_val, unique_pass_count = number_of_passes_val, average = average_val)
 }
 
 top <- function(numval, seen_table, wild_table) {
@@ -160,36 +178,46 @@ top <- function(numval, seen_table, wild_table) {
     #                    to the most common passwords WE have seen, in order of decreasing frequency (most common at index 0)]
     # }
 
-    worstKracksArray <- c()
-    seenCommonArray <- c()
-    wildCommonArray <- c()    
+    worstKracksArray <- list()
+    seenCommonArray <- list()
+    wildCommonArray <- list()    
 
     numSeen <- numval
     numWild <- numval
+    numKrack <- numval
     
     if ( nrow(seen_table) > 0 ) {
-        if ( nrow(seen_table) < numval ) { numSeen <- nrow(seen_table) }
 
-        worstKracks <- seen_table[seen_table$cpu_brute_time > 0,]
-        worstKracks <- worstKracks[order(worstKracks$cpu_brute_time, decreasing = FALSE),][1:numSeen,]
+	worstKracks <- seen_table[seen_table$cpu_brute_time > 0,]
+
+        if ( nrow(seen_table) < numval ) { numSeen <- nrow(seen_table) }
+	if ( nrow(worstKracks) < numval ) { numKrack <- nrow(worstKracks) }
+
+	if (numKrack > 0) {
+        worstKracks <- worstKracks[order(worstKracks$cpu_brute_time, decreasing = FALSE),][1:numKrack,]
         worstKracks <- subset(worstKracks, select = c("plaintext", "cpu_brute_time"))
         worstKracksArray <- split(worstKracks, seq(nrow(worstKracks)))
         names(worstKracksArray) = NULL
-    
+	}
+
+	if (numSeen > 0) {
         seenCommon <- seen_table[order(seen_table$seen_count, decreasing = TRUE),][1:numSeen,]
         seenCommon <- subset(seenCommon, select = c("plaintext", "seen_count"))
         seenCommonArray <- split(seenCommon, seq(nrow(seenCommon)))
         names(seenCommonArray) = NULL
+	}
     }
 
     if ( nrow(wild_table) > 0 ) {
         if ( nrow(wild_table) < numval ) { numWild <- nrow(wild_table) }
-
+	
+	if (numWild > 0) {
         wildCommon <- wild_table[wild_table$rank_wild > 0,]
         wildCommon <- wildCommon[order(wildCommon$rank_wild, decreasing = FALSE),][1:numWild,]
         wildCommon <- subset(wildCommon, select = c("plaintext", "rank_wild"))
         wildCommonArray <- split(wildCommon, seq(nrow(wildCommon)))
         names(wildCommonArray) = NULL
+	}
     }
 
     finalResult <- list(fastest=worstKracksArray, wild_common=wildCommonArray, seen_common=seenCommonArray)
@@ -295,4 +323,4 @@ passProportions <- function(pass) {
     result <- c( lower / str_length, upper / str_length, num / str_length, spec / str_length)
 }
 
-test()
+#test()
